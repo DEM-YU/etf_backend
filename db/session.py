@@ -5,8 +5,8 @@ database and session layer
 3. expose fastapi dependency for injection functions
 '''
 
-from colections.abc import AsyncGenerator
-from tyrping import Annotated
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
 import redis.asyncio as aioredis
 from fastapi import Depends
@@ -65,3 +65,32 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async def end[oint(db: Dbsession) -> ...:
         result = await db.excute(...)
     '''
+
+    async with AsyncSessionFactory() as session:
+        # commit transaction if no exception was raised
+        try:
+            yield session
+            await session.commit()
+        # rollback on any error to maintain integrity
+        except Exception:
+            await session.rollback()
+            raise
+
+async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+        '''
+        redis connection dependency.
+        
+        usage:
+        async def endpoint(redis: Redis) -> ...:
+            await redis.set(...)
+        '''
+    
+        redis = aioredis.Redis(connection_pool=redis_pool)
+        try:
+            yield redis
+        finally:
+            await redis.close()
+
+
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+RedisClient = Annotated[aioredis.Redis, Depends(get_redis)]
